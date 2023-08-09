@@ -13,4 +13,4 @@
 
 If you have Python installed, you can rename the `main.py` file to `main.pyw` and run it. This will run the program without a console window, and act as if it were an executable.
 
-If you don't have Python installed, you can download the executable from the [releases]() page.
+If you don't have Python installed, you can download the executable from the [releases](https://github.com/WhenLifeHandsYouLemons/Stock-Tracker/releases) page.
