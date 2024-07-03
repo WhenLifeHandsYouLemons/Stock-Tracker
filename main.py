@@ -5,7 +5,7 @@ from requests_html import HTMLSession   # https://github.com/psf/requests-html
 import tkinter as tk
 
 # Testing
-import cpi
+# import cpi
 
 # Functions
 def open_database(filename):
@@ -36,7 +36,7 @@ def search(URL):
     return result
 
 def get_stock_name(stock_code):
-    URL = f"https://query2.finance.yahoo.com/v7/finance/options/{stock_code}"
+    URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
     result = search(URL)
 
     # Get the stock's name
@@ -48,7 +48,7 @@ def get_stock_name(stock_code):
     return name
 
 def get_stock_info(stock_code):
-    URL = f"https://query2.finance.yahoo.com/v7/finance/options/{stock_code}"
+    URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
 
     return_info = []
 
@@ -65,6 +65,8 @@ def get_stock_info(stock_code):
             return_info.append("↑")
         else:
             return_info.append("↓")
+
+        update_stock_update_date(stock_code)
     except:
         return_info.append("Error")
 
@@ -84,6 +86,8 @@ def remove_stock(stock_code):
     remove_successful_text = tk.Label(text="Stock removed successfully! Please restart the application to fully remove the stock.", master=window)
     remove_successful_text.grid(row=2, column=0)
 
+def update_stock_update_date(stock_code):
+    write_database(connection, f"UPDATE stocks SET last_updated=datetime('now', 'localtime') WHERE stock_code='{stock_code}';")
 
 # Open database
 file_name = "stocks.db"
@@ -118,13 +122,14 @@ stocks.append([
     tk.Label(text="Price Paid", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
     tk.Label(text="Price Change", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
     tk.Label(text="Profit/Loss", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
+    tk.Label(text="Last Updated", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
     tk.Label(text="", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
 ])
 
 # Get all the stock information and save it
 print("\nGetting latest stock information, please wait...")
 i = 0
-while i != len(table)-1:
+while i < len(table):
     stock = table[i]
 
     if debug == True:
@@ -152,6 +157,11 @@ while i != len(table)-1:
         profit = "NaN"
         profit_colour = "#000000"
 
+    if stock["stock_name"] == "Error":
+        last_updated_date = "Error"
+    else:
+        last_updated_date = stock["last_updated"]
+
     stocks.append([
         tk.Label(text=stock["stock_code"], master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
         tk.Label(text=stock["stock_name"], master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
@@ -160,6 +170,7 @@ while i != len(table)-1:
         tk.Label(text=stock["buying_price"], master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
         tk.Label(text=change, master=stock_info_frame, padx=padding, font=(font_family, body_font_size, "bold"), fg=change_colour),
         tk.Label(text=profit, master=stock_info_frame, padx=padding, font=(font_family, body_font_size), fg=profit_colour),
+        tk.Label(text=last_updated_date, master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
         tk.Button(text="Remove", master=stock_info_frame, padx=padding, command=lambda : remove_stock(stock["stock_code"])),
     ])
 
@@ -186,7 +197,7 @@ input_price_field.grid(row=1, column=2)
 submit_button.grid(row=1, column=3)
 
 # Display stored stock widgets
-for i in range(len(table)):
+for i in range(len(table)+1):
     for j in range(len(stocks[0])):
         stocks[i][j].grid(row=i, column=j)
 
