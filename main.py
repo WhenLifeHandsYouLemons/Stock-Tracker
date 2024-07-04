@@ -1,11 +1,17 @@
 debug = False
 
+from datetime import datetime
 import sqlite3
+import requests
 from requests_html import HTMLSession   # https://github.com/psf/requests-html
 import tkinter as tk
 
-# Testing
-# import cpi
+# API keys
+try:
+    with open("secrets.txt", "r") as file:
+        exchange_rate_api_key = file.readline()
+except:
+    exchange_rate_api_key = "Error"
 
 # Functions
 def open_database(filename):
@@ -47,6 +53,30 @@ def get_stock_name(stock_code):
 
     return name
 
+def get_stock_currency(stock_code):
+    URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
+    result = search(URL)
+
+    # Get the stock's trading currency
+    try:
+        currency = result["optionChain"]["result"][0]["quote"]["currency"]
+    except:
+        currency = "Error"
+
+    return currency
+
+def get_exchange_rate(currency1, currency2):
+    URL = f"https://v6.exchangerate-api.com/v6/{exchange_rate_api_key}/latest/{currency1}"
+    result = search(URL)
+
+    # Get the exchange rate between two currencies
+    try:
+        rate = float(result["conversion_rates"][currency2])
+    except:
+        rate = "Error"
+
+    return rate
+
 def get_stock_info(stock_code):
     URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
 
@@ -74,10 +104,19 @@ def get_stock_info(stock_code):
 
 def add_stock():
     code = input_code_field.get()
-    price = input_price_field.get()
+    price = float(input_price_field.get())
     quantity = input_quantity_field.get()
+    true_currency = get_stock_currency(code)
+    currency = currency_field.get()
+
+    if true_currency != "Error":
+        exchange_rate = get_exchange_rate(currency, true_currency)
+        if exchange_rate != "Error":
+            price *= exchange_rate
+            currency = true_currency
+
     # Add to the database
-    write_database(connection, f"INSERT INTO stocks (stock_code, stock_name, quantity, buying_price) VALUES ('{code}', '{get_stock_name(code)}', {quantity}, {price});")
+    write_database(connection, f"INSERT INTO stocks (stock_code, stock_name, quantity, buying_price, currency) VALUES ('{code}', '{get_stock_name(code)}', {quantity}, {price}, '{currency}');")
     add_successful_text.grid(row=2, columnspan=4)
 
 def remove_stock(stock_code):
@@ -117,6 +156,7 @@ stocks = []
 stocks.append([
     tk.Label(text="Stock Code", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
     tk.Label(text="Stock Name", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
+    tk.Label(text="Currency", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
     tk.Label(text="Stock Price", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
     tk.Label(text="Quantity", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
     tk.Label(text="Price Paid", master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
@@ -159,12 +199,16 @@ while i < len(table):
 
     if stock["stock_name"] == "Error":
         last_updated_date = "Error"
+    elif stock["last_updated"] == None:
+        update_stock_update_date(stock["stock_code"])
+        last_updated_date = str(datetime.now()).split(".")[0]
     else:
         last_updated_date = stock["last_updated"]
 
     stocks.append([
         tk.Label(text=stock["stock_code"], master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
         tk.Label(text=stock["stock_name"], master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
+        tk.Label(text=stock["currency"], master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
         tk.Label(text=price, master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
         tk.Label(text=stock["quantity"], master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
         tk.Label(text=stock["buying_price"], master=stock_info_frame, padx=padding, font=(font_family, body_font_size)),
@@ -185,6 +229,8 @@ input_quantity_help = tk.Label(text="Quantity", master=add_frame)
 input_quantity_field = tk.Entry(master=add_frame)
 input_price_help = tk.Label(text="Price Paid", master=add_frame)
 input_price_field = tk.Entry(master=add_frame)
+currency_help = tk.Label(text="Currency (e.g.: USD)", master=add_frame)
+currency_field = tk.Entry(master=add_frame)
 submit_button = tk.Button(text="Add Stock", master=add_frame, command=lambda : add_stock())
 add_successful_text = tk.Label(text="Stock added successfully! Please restart the application to see the new stock.", master=add_frame)
 
@@ -194,7 +240,9 @@ input_quantity_help.grid(row=0, column=1)
 input_quantity_field.grid(row=1, column=1)
 input_price_help.grid(row=0, column=2)
 input_price_field.grid(row=1, column=2)
-submit_button.grid(row=1, column=3)
+currency_help.grid(row=0, column=3)
+currency_field.grid(row=1, column=3)
+submit_button.grid(row=1, column=4)
 
 # Display stored stock widgets
 for i in range(len(table)+1):
