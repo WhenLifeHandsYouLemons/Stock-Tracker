@@ -6,6 +6,8 @@ import sqlite3  # For database management
 from requests_html import HTMLSession   # https://github.com/psf/requests-html  # For web scraping
 from tkinter import *       # For GUI
 from tkinter.ttk import *   # For GUI
+from matplotlib.figure import Figure    # For plotting stock charts
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg   # For plotting stock charts
 
 # API keys (stored in secrets.txt)
 try:
@@ -13,6 +15,76 @@ try:
         exchange_rate_api_key = file.readline()
 except:
     exchange_rate_api_key = "Error"
+
+
+class StockInfoWindow():
+    def __init__(self, master, stock_code) -> None:
+        self.stock_code = stock_code
+
+        self.master = Toplevel(master)
+        self.master.configure()
+        self.master.title(f"{stock_code} Stock Information")
+
+        self.font_family = "Arial"
+        self.body_font_size = 14
+        self.title_font_size = 18
+
+        self.page_items()
+
+        # Put everything above this
+        self.master.mainloop()
+
+    def page_items(self) -> None:
+        title_frame = Frame(master=self.master, padding=15)
+        txt_title = Label(text=f"{self.stock_code} Stock Information", master=title_frame, font=(self.font_family, self.title_font_size))
+        txt_title.pack()
+
+        stock_info_frame = Frame(master=self.master, padding=5)
+
+        chart = Figure(figsize = (10, 5), dpi = 75)
+
+        time, data = self.get_stock_chart_data("5d")
+
+        plot1 = chart.add_subplot(1, 1, 1)
+        plot1.plot(time, data)
+        # time, data = self.get_stock_chart_data("1mo")
+        # plot1.plot(time, data)
+
+        canvas = FigureCanvasTkAgg(chart, master=stock_info_frame)
+        canvas.draw()
+        canvas.get_tk_widget().grid(row=1, column=1)
+
+        title_frame.grid(row=0, column=0)
+        stock_info_frame.grid(row=1, column=0)
+
+    def get_stock_chart_data(self, duration) -> list:
+        if duration == "1d":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=1d&interval=1m"
+        elif duration == "5d":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=5d&interval=5m"
+        elif duration == "1mo":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=1mo&interval=1d"
+        elif duration == "3mo":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=3mo&interval=1d"
+        elif duration == "6mo":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=6mo&interval=1d"
+        elif duration == "1y":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=1y&interval=1d"
+        elif duration == "2y":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=2y&interval=1wk"
+        elif duration == "5y":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=5y&interval=1wk"
+        elif duration == "max":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=max&interval=1mo"
+        else:
+            URL = ""
+
+        result = search(URL)
+
+        with open("temp.json", "w") as file:
+            file.write(str(result).replace("'", "\"").replace("None", "null").replace("False", "false").replace("True", "true"))
+
+        return result["chart"]["result"][0]["timestamp"], result["chart"]["result"][0]["indicators"]["quote"][0]["close"]
 
 # Functions
 def open_database(filename):
@@ -226,7 +298,7 @@ while i < len(table):
         last_updated_date = str(datetime.now()).split(".")[0]
 
     stocks.append([
-        Button(text="View Info", master=stock_info_frame, padding=padding, command=lambda stock_code=stock["stock_code"]: print(f"Viewing {stock_code} stock information")),
+        Button(text="View Info", master=stock_info_frame, padding=padding, command=lambda stock_code=stock["stock_code"]: StockInfoWindow(window, stock_code)),
         Label(text=stock["stock_code"], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
         Label(text=stock["stock_name"], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
         Label(text=stock["currency"], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
