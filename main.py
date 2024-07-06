@@ -8,6 +8,7 @@ from tkinter import *       # For GUI
 from tkinter.ttk import *   # For GUI
 from matplotlib.figure import Figure    # For plotting stock charts
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg   # For plotting stock charts
+import matplotlib.dates as mdates   # For plotting stock charts
 
 # API keys (stored in secrets.txt)
 try:
@@ -43,12 +44,23 @@ class StockInfoWindow():
 
         chart = Figure(figsize = (10, 5), dpi = 75)
 
-        time, data = self.get_stock_chart_data("5d")
+        chart_type = "1d"
+        time, data = self.get_stock_chart_data(chart_type, "close")
 
         plot1 = chart.add_subplot(1, 1, 1)
-        plot1.plot(time, data)
-        # time, data = self.get_stock_chart_data("1mo")
-        # plot1.plot(time, data)
+        plot1.set_xlabel("Time")
+        plot1.set_ylabel("Closing Price")
+        plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
+        plot1.plot(time, data, color="black", label="Closing Price")
+
+        time, data = self.get_stock_chart_data(chart_type, "open")
+        plot1.plot(time, data, color="grey", label="Opening Price")
+
+        time, data = self.get_stock_chart_data(chart_type, "low")
+        plot1.plot(time, data, color="red", label="Low Price")
+
+        time, data = self.get_stock_chart_data(chart_type, "high")
+        plot1.plot(time, data, color="green", label="High Price")
 
         canvas = FigureCanvasTkAgg(chart, master=stock_info_frame)
         canvas.draw()
@@ -57,34 +69,36 @@ class StockInfoWindow():
         title_frame.grid(row=0, column=0)
         stock_info_frame.grid(row=1, column=0)
 
-    def get_stock_chart_data(self, duration) -> list:
+    def get_stock_chart_data(self, duration, metric_type) -> list:
         if duration == "1d":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=1d&interval=1m"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=1d&interval=1m"
         elif duration == "5d":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=5d&interval=5m"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=5d&interval=1m"
         elif duration == "1mo":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=1mo&interval=1d"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=1mo&interval=1d"
         elif duration == "3mo":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=3mo&interval=1d"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=3mo&interval=1d"
         elif duration == "6mo":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=6mo&interval=1d"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=6mo&interval=1d"
         elif duration == "1y":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=1y&interval=1d"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=1y&interval=1d"
         elif duration == "2y":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=2y&interval=1wk"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=2y&interval=1wk"
         elif duration == "5y":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=5y&interval=1wk"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=5y&interval=1wk"
+        elif duration == "ytd":
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=ytd&interval=1d"
         elif duration == "max":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics=close?&range=max&interval=1mo"
+            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=max&interval=1mo"
         else:
             URL = ""
 
         result = search(URL)
 
-        with open("temp.json", "w") as file:
-            file.write(str(result).replace("'", "\"").replace("None", "null").replace("False", "false").replace("True", "true"))
+        time = [datetime.fromtimestamp(x) for x in result["chart"]["result"][0]["timestamp"]]
+        prices = result["chart"]["result"][0]["indicators"]["quote"][0][metric_type]
 
-        return result["chart"]["result"][0]["timestamp"], result["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+        return time, prices
 
 # Functions
 def open_database(filename):
