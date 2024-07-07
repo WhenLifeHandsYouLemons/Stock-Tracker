@@ -27,7 +27,7 @@ class StockInfoWindow():
         self.master.title(f"{stock_code} Stock Information")
 
         self.font_family = "Arial"
-        self.body_font_size = 14
+        self.body_font_size = 12
         self.title_font_size = 18
 
         self.page_items()
@@ -42,63 +42,127 @@ class StockInfoWindow():
 
         stock_info_frame = Frame(master=self.master, padding=5)
 
-        chart = Figure(figsize = (10, 5), dpi = 75)
+        # Buttons to change chart type
+        chart_options_frame = Frame(master=stock_info_frame, padding=5)
+        chart_range_label = Label(text="Chart Type:", master=chart_options_frame, font=(self.font_family, self.body_font_size))
+        chart_range_label.grid(row=0, column=0)
 
-        chart_type = "1d"
-        time, data = self.get_stock_chart_data(chart_type, "close")
+        chart_range_types = [["1d", "1 Day"],
+                             ["5d", "5 Days"],
+                             ["1mo", "1 Month"],
+                             ["3mo", "3 Months"],
+                             ["6mo", "6 Months"],
+                             ["1y", "1 Year"],
+                             ["2y", "2 Years"],
+                             ["5y", "5 Years"],
+                             ["ytd", "Year to Date"],
+                             ["max", "Max"]]
 
-        plot1 = chart.add_subplot(1, 1, 1)
-        plot1.set_xlabel("Time")
-        plot1.set_ylabel("Closing Price")
-        plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
-        plot1.plot(time, data, color="black", label="Closing Price")
+        self.selected_chart_range = StringVar()
+        self.selected_chart_range.set(chart_range_types[0])
 
-        time, data = self.get_stock_chart_data(chart_type, "open")
-        plot1.plot(time, data, color="grey", label="Opening Price")
+        for i in range(len(chart_range_types)):
+            Button(text=chart_range_types[i][1], master=chart_options_frame, command=lambda range_option=chart_range_types[i]: self.change_chart_range(range_option)).grid(row=i+1, column=0)
 
-        time, data = self.get_stock_chart_data(chart_type, "low")
-        plot1.plot(time, data, color="red", label="Low Price")
+        # Small spacer between options
+        chart_option_spacer = Label(text="", master=chart_options_frame)
+        chart_option_spacer.grid(row=len(chart_range_types)+1, column=0)
 
-        time, data = self.get_stock_chart_data(chart_type, "high")
-        plot1.plot(time, data, color="green", label="High Price")
+        # Low, high, opening, closing options
+        chart_data_label = Label(text="Data:", master=chart_options_frame, font=(self.font_family, self.body_font_size))
+        chart_data_label.grid(row=len(chart_range_types)+2, column=0)
 
-        canvas = FigureCanvasTkAgg(chart, master=stock_info_frame)
-        canvas.draw()
-        canvas.get_tk_widget().grid(row=1, column=1)
+        chart_data_types = [["low", "Low Price"],
+                            ["high", "High Price"],
+                            ["open", "Opening Price"],
+                            ["close", "Closing Price"]]
+
+        self.selected_chart_data = StringVar()
+        self.selected_chart_data.set(chart_data_types[-1])
+
+        for i in range(len(chart_data_types)):
+            Button(text=chart_data_types[i][1], master=chart_options_frame, command=lambda data_option=chart_data_types[i]: self.change_chart_data(data_option)).grid(row=i+len(chart_range_types)+3, column=0)
+
+        chart_options_frame.grid(row=0, column=0)
+
+        # Stock chart
+        self.chart = Figure(figsize = (10, 5), dpi = 75)
+
+        self.plot1 = self.chart.add_subplot()
+        self.plot1.set_xlabel("Time")
+        self.plot1.set_ylabel(str(self.selected_chart_data.get().split(", ")[1][1:-2]))
+        self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
+
+        time, data = self.get_stock_chart_data(str(self.selected_chart_range.get().split(", ")[0][2:-1]), str(self.selected_chart_data.get().split(", ")[0][2:-1]))
+        self.plot1.plot(time, data, "-", color="black", label=str(self.selected_chart_range.get().split(", ")[1][1:-2]))
+
+        self.chart_canvas = FigureCanvasTkAgg(self.chart, master=stock_info_frame)
+        self.chart_canvas.draw()
+        self.chart_canvas.get_tk_widget().grid(row=0, column=1)
+
+        #! Add live ticker value for current stock price here
+        #! Add opening, closing, high, and low prices here
 
         title_frame.grid(row=0, column=0)
         stock_info_frame.grid(row=1, column=0)
 
     def get_stock_chart_data(self, duration, metric_type) -> list:
-        if duration == "1d":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=1d&interval=1m"
-        elif duration == "5d":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=5d&interval=1m"
-        elif duration == "1mo":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=1mo&interval=1d"
-        elif duration == "3mo":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=3mo&interval=1d"
-        elif duration == "6mo":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=6mo&interval=1d"
-        elif duration == "1y":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=1y&interval=1d"
-        elif duration == "2y":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=2y&interval=1wk"
-        elif duration == "5y":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=5y&interval=1wk"
-        elif duration == "ytd":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=ytd&interval=1d"
+        if duration == "1d" or duration == "5d":
+            interval = "1m"
+        elif duration == "1mo" or duration == "3mo" or duration == "6mo" or duration == "1y" or duration == "ytd":
+            interval = "1d"
+        elif duration == "2y" or duration == "5y":
+            interval = "1wk"
         elif duration == "max":
-            URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range=max&interval=1mo"
-        else:
-            URL = ""
+            interval = "1mo"
 
+        URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range={duration}&interval={interval}"
         result = search(URL)
 
         time = [datetime.fromtimestamp(x) for x in result["chart"]["result"][0]["timestamp"]]
         prices = result["chart"]["result"][0]["indicators"]["quote"][0][metric_type]
 
         return time, prices
+
+    def change_chart_range(self, chart_range) -> None:
+        time, data = self.get_stock_chart_data(chart_range[0], str(self.selected_chart_data.get().split(", ")[0][2:-1]))
+
+        self.plot1.clear()
+        self.plot1.plot(time, data, "-", color=self.change_chart_color(str(self.selected_chart_data.get().split(", ")[0][2:-1])), label=str(self.selected_chart_data.get().split(", ")[1][1:-2]))
+
+        self.plot1.set_ylabel(str(self.selected_chart_data.get().split(", ")[1][1:-2]))
+        self.plot1.set_xlabel("Time")
+        self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
+
+        self.selected_chart_range.set(chart_range)
+
+        self.chart_canvas.draw()
+
+    def change_chart_data(self, chart_data) -> None:
+        time, data = self.get_stock_chart_data(str(self.selected_chart_range.get().split(", ")[0][2:-1]), chart_data[0])
+
+        self.plot1.clear()
+        self.plot1.plot(time, data, "-", color=self.change_chart_color(chart_data[0]), label=chart_data[1])
+
+        self.plot1.set_ylabel(chart_data[1])
+        self.plot1.set_xlabel("Time")
+        self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
+
+        self.selected_chart_data.set(chart_data)
+
+        self.chart_canvas.draw()
+
+    def change_chart_color(self, data) -> str:
+        if data == "close":
+            return "black"
+        elif data == "open":
+            return "grey"
+        elif data == "high":
+            return "green"
+        elif data == "low":
+            return "red"
+        else:
+            return "black"
 
 # Functions
 def open_database(filename):
@@ -213,13 +277,13 @@ def add_stock():
 
     # Add to the database
     write_database(connection, f"INSERT INTO stocks (stock_code, stock_name, quantity, buying_price, currency) VALUES ('{code}', '{get_stock_name(code)}', {quantity}, {price}, '{currency}');")
-    add_successful_text = Label(text=f"{quantity} {code} stocks added successfully! Please restart the application to update your portfolio.", master=add_frame)
+    add_successful_text = Label(text=f"{quantity} {code} stocks added successfully! Please restart the application to update your portfolio.", master=add_frame, font=(font_family, body_font_size))
     add_successful_text.grid(row=2, columnspan=4)
 
 def remove_stock(stock_code):
     # Remove from database
     write_database(connection, f"DELETE FROM stocks WHERE stock_code='{stock_code}';")
-    remove_successful_text = Label(text=f"{stock_code} stocks removed successfully! Please restart the program to remove it from your portfolio.", master=window)
+    remove_successful_text = Label(text=f"{stock_code} stocks removed successfully! Please restart the program to remove it from your portfolio.", master=window, font=(font_family, body_font_size))
     remove_successful_text.grid(row=2, column=0)
 
 def update_stock_update_date(stock_code):
@@ -242,7 +306,7 @@ window.configure()  # Can change bg colour here
 window.title("Stock Tracker")
 
 font_family = "Arial"
-body_font_size = 14
+body_font_size = 12
 title_font_size = 24
 
 # Title frame
