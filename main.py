@@ -72,32 +72,25 @@ class StockInfoWindow():
         chart_data_label = Label(text="Data:", master=chart_options_frame, font=(self.font_family, self.body_font_size))
         chart_data_label.grid(row=len(chart_range_types)+2, column=0)
 
-        chart_data_types = [["low", "Low Price"],
+        self.chart_data_types = [["low", "Low Price"],
                             ["high", "High Price"],
                             ["open", "Opening Price"],
                             ["close", "Closing Price"]]
+        self.chart_data_visibility = [StringVar(value=False) for i in range(len(self.chart_data_types))]
+        self.chart_data_visibility[-1].set(True)
 
-        self.selected_chart_data = StringVar()
-        self.selected_chart_data.set(chart_data_types[-1])
-
-        for i in range(len(chart_data_types)):
-            Button(text=chart_data_types[i][1], master=chart_options_frame, command=lambda data_option=chart_data_types[i]: self.change_chart_data(data_option)).grid(row=i+len(chart_range_types)+3, column=0)
+        for i in range(len(self.chart_data_types)):
+            Checkbutton(text=self.chart_data_types[i][1], master=chart_options_frame, variable=self.chart_data_visibility[i], command=lambda: self.toggle_chart_data()).grid(row=i+len(chart_range_types)+3, column=0)
 
         chart_options_frame.grid(row=0, column=0)
 
         # Stock chart
         self.chart = Figure(figsize = (10, 5), dpi = 75)
-
         self.plot1 = self.chart.add_subplot()
-        self.plot1.set_xlabel("Time")
-        self.plot1.set_ylabel(str(self.selected_chart_data.get().split(", ")[1][1:-2]))
-        self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
-
-        time, data = self.get_stock_chart_data(str(self.selected_chart_range.get().split(", ")[0][2:-1]), str(self.selected_chart_data.get().split(", ")[0][2:-1]))
-        self.plot1.plot(time, data, "-", color="black", label=str(self.selected_chart_range.get().split(", ")[1][1:-2]))
-
         self.chart_canvas = FigureCanvasTkAgg(self.chart, master=stock_info_frame)
-        self.chart_canvas.draw()
+
+        self.toggle_chart_data()
+
         self.chart_canvas.get_tk_widget().grid(row=0, column=1)
 
         #! Add live ticker value for current stock price here
@@ -125,12 +118,15 @@ class StockInfoWindow():
         return time, prices
 
     def change_chart_range(self, chart_range) -> None:
-        time, data = self.get_stock_chart_data(chart_range[0], str(self.selected_chart_data.get().split(", ")[0][2:-1]))
-
         self.plot1.clear()
-        self.plot1.plot(time, data, "-", color=self.change_chart_color(str(self.selected_chart_data.get().split(", ")[0][2:-1])), label=str(self.selected_chart_data.get().split(", ")[1][1:-2]))
 
-        self.plot1.set_ylabel(str(self.selected_chart_data.get().split(", ")[1][1:-2]))
+        for i in self.chart_data_visibility:
+            if bool(int(i.get())):
+                chart_data = self.chart_data_types[self.chart_data_visibility.index(i)]
+                time, data = self.get_stock_chart_data(chart_range[0], chart_data[0])
+                self.plot1.plot(time, data, "-", color=self.change_chart_color(chart_data[0]), label=chart_data[1])
+
+        self.plot1.set_ylabel("Price")
         self.plot1.set_xlabel("Time")
         self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
 
@@ -138,17 +134,19 @@ class StockInfoWindow():
 
         self.chart_canvas.draw()
 
-    def change_chart_data(self, chart_data) -> None:
-        time, data = self.get_stock_chart_data(str(self.selected_chart_range.get().split(", ")[0][2:-1]), chart_data[0])
-
+    def toggle_chart_data(self) -> None:
+        # Change the chart data to the selected data
         self.plot1.clear()
-        self.plot1.plot(time, data, "-", color=self.change_chart_color(chart_data[0]), label=chart_data[1])
 
-        self.plot1.set_ylabel(chart_data[1])
+        for i in self.chart_data_visibility:
+            if bool(int(i.get())):
+                chart_data = self.chart_data_types[self.chart_data_visibility.index(i)]
+                time, data = self.get_stock_chart_data(str(self.selected_chart_range.get().split(", ")[0][2:-1]), chart_data[0])
+                self.plot1.plot(time, data, "-", color=self.change_chart_color(chart_data[0]), label=chart_data[1])
+
+        self.plot1.set_ylabel("Price")
         self.plot1.set_xlabel("Time")
         self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
-
-        self.selected_chart_data.set(chart_data)
 
         self.chart_canvas.draw()
 
