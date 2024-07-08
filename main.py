@@ -93,11 +93,34 @@ class StockInfoWindow():
 
         self.chart_canvas.get_tk_widget().grid(row=0, column=1)
 
-        #! Add live ticker value for current stock price here
-        #! Add opening, closing, high, and low prices here
+        # Show the current, opening, closing, high, and low prices
+        self.get_current_stock_data()
 
+        #! Should be changed to a live value instead
+        current_stock_price = Label(text=f"Current Price: {self.get_current_stock_data()[0]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        current_stock_price.grid(row=1, column=1, sticky="W")
+
+        opening_stock_price = Label(text=f"Opening Price: {self.get_current_stock_data()[1]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        opening_stock_price.grid(row=2, column=1, sticky="W")
+
+        closing_stock_price = Label(text=f"Previous closing Price: {self.get_current_stock_data()[2]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        closing_stock_price.grid(row=3, column=1, sticky="W")
+
+        high_stock_price = Label(text=f"High Price: {self.get_current_stock_data()[3]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        high_stock_price.grid(row=4, column=1, sticky="W")
+
+        # Add the frames to the screen
         title_frame.grid(row=0, column=0)
         stock_info_frame.grid(row=1, column=0)
+
+    def get_current_stock_data(self) -> list:
+        URL = f"https://query2.finance.yahoo.com/v6/finance/options/{self.stock_code}"
+
+        result = search(URL)
+        info = result["optionChain"]["result"][0]["quote"]
+
+        # Returns, current price, opening price, closing price, high price, low price
+        return [info["regularMarketPrice"], info["regularMarketOpen"], info["regularMarketPreviousClose"], info["regularMarketDayHigh"], info["regularMarketDayLow"]]
 
     def get_stock_chart_data(self, duration, metric_type) -> list:
         if duration == "1d" or duration == "5d":
@@ -126,9 +149,7 @@ class StockInfoWindow():
                 time, data = self.get_stock_chart_data(chart_range[0], chart_data[0])
                 self.plot1.plot(time, data, "-", color=self.change_chart_color(chart_data[0]), label=chart_data[1])
 
-        self.plot1.set_ylabel("Price")
-        self.plot1.set_xlabel("Time")
-        self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
+        self.show_chart_info()
 
         self.selected_chart_range.set(chart_range)
 
@@ -144,11 +165,15 @@ class StockInfoWindow():
                 time, data = self.get_stock_chart_data(str(self.selected_chart_range.get().split(", ")[0][2:-1]), chart_data[0])
                 self.plot1.plot(time, data, "-", color=self.change_chart_color(chart_data[0]), label=chart_data[1])
 
+        self.show_chart_info()
+
+        self.chart_canvas.draw()
+
+    def show_chart_info(self) -> None:
         self.plot1.set_ylabel("Price")
         self.plot1.set_xlabel("Time")
         self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
-
-        self.chart_canvas.draw()
+        self.plot1.legend()
 
     def change_chart_color(self, data) -> str:
         if data == "close":
