@@ -1,14 +1,13 @@
 # If debug is enabled, the program will not search for stock information online
-debug = False
+offline_mode = True
 
-from datetime import datetime   # For getting the current date and time
-import sqlite3  # For database management
+from datetime import datetime           # For getting the current date and time
+import sqlite3                          # For database management
 from requests_html import HTMLSession   # https://github.com/psf/requests-html  # For web scraping
-from tkinter import *       # For GUI
-from tkinter.ttk import *   # For GUI
+from tkinter import *                   # For GUI
+from tkinter.ttk import *               # For GUI
 from matplotlib.figure import Figure    # For plotting stock charts
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg   # For plotting stock charts
-import matplotlib.dates as mdates   # For plotting stock charts
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg # For plotting stock charts
 
 # API keys (stored in secrets.txt)
 try:
@@ -17,9 +16,8 @@ try:
 except:
     exchange_rate_api_key = "Error"
 
-
 class StockInfoWindow():
-    def __init__(self, master, stock_code) -> None:
+    def __init__(self, master, stock_code: str) -> None:
         self.stock_code = stock_code
 
         self.master = Toplevel(master)
@@ -30,12 +28,12 @@ class StockInfoWindow():
         self.body_font_size = 12
         self.title_font_size = 18
 
-        self.page_items()
+        self.pageItems()
 
         # Put everything above this
         self.master.mainloop()
 
-    def page_items(self) -> None:
+    def pageItems(self) -> None:
         title_frame = Frame(master=self.master, padding=15)
         txt_title = Label(text=f"{self.stock_code} Stock Information", master=title_frame, font=(self.font_family, self.title_font_size))
         txt_title.pack()
@@ -62,7 +60,7 @@ class StockInfoWindow():
         self.selected_chart_range.set(chart_range_types[0])
 
         for i in range(len(chart_range_types)):
-            Button(text=chart_range_types[i][1], master=chart_options_frame, command=lambda range_option=chart_range_types[i]: self.change_chart_range(range_option)).grid(row=i+1, column=0)
+            Button(text=chart_range_types[i][1], master=chart_options_frame, command=lambda range_option=chart_range_types[i]: self.changeChartRange(range_option)).grid(row=i+1, column=0)
 
         # Small spacer between options
         chart_option_spacer = Label(text="", master=chart_options_frame)
@@ -80,7 +78,7 @@ class StockInfoWindow():
         self.chart_data_visibility[-1].set(True)
 
         for i in range(len(self.chart_data_types)):
-            Checkbutton(text=self.chart_data_types[i][1], master=chart_options_frame, variable=self.chart_data_visibility[i], command=lambda: self.toggle_chart_data()).grid(row=i+len(chart_range_types)+3, column=0)
+            Checkbutton(text=self.chart_data_types[i][1], master=chart_options_frame, variable=self.chart_data_visibility[i], command=lambda: self.toggleChartPriceTypes()).grid(row=i+len(chart_range_types)+3, column=0)
 
         chart_options_frame.grid(row=0, column=0)
 
@@ -89,40 +87,60 @@ class StockInfoWindow():
         self.plot1 = self.chart.add_subplot()
         self.chart_canvas = FigureCanvasTkAgg(self.chart, master=stock_info_frame)
 
-        self.toggle_chart_data()
+        self.toggleChartPriceTypes()
 
         self.chart_canvas.get_tk_widget().grid(row=0, column=1)
 
         # Show the current, opening, closing, high, and low prices
-        self.get_current_stock_data()
+        self.getStockData()
 
-        #! Should be changed to a live value instead
-        current_stock_price = Label(text=f"Current Price: {self.get_current_stock_data()[0]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        # Get live stock data
+        self.master.after(2000, self.getLiveStockData)
+        self.current_stock_price_var = StringVar(value="Current Price: Loading...")
+
+        current_stock_price = Label(textvariable=self.current_stock_price_var, justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
         current_stock_price.grid(row=1, column=1, sticky="W")
 
-        opening_stock_price = Label(text=f"Opening Price: {self.get_current_stock_data()[1]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        opening_stock_price = Label(text=f"Opening Price: {self.getStockData()[1]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
         opening_stock_price.grid(row=2, column=1, sticky="W")
 
-        closing_stock_price = Label(text=f"Previous closing Price: {self.get_current_stock_data()[2]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        closing_stock_price = Label(text=f"Previous closing Price: {self.getStockData()[2]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
         closing_stock_price.grid(row=3, column=1, sticky="W")
 
-        high_stock_price = Label(text=f"High Price: {self.get_current_stock_data()[3]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        high_stock_price = Label(text=f"High Price: {self.getStockData()[3]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
         high_stock_price.grid(row=4, column=1, sticky="W")
 
         # Add the frames to the screen
         title_frame.grid(row=0, column=0)
         stock_info_frame.grid(row=1, column=0)
 
-    def get_current_stock_data(self) -> list:
+    def getStockData(self) -> list:
         URL = f"https://query2.finance.yahoo.com/v6/finance/options/{self.stock_code}"
 
-        result = search(URL)
-        info = result["optionChain"]["result"][0]["quote"]
+        try:
+            result = search(URL)
+            info = result["optionChain"]["result"][0]["quote"]
+        except:
+            return ["Error" for i in range(5)]
 
         # Returns, current price, opening price, closing price, high price, low price
         return [info["regularMarketPrice"], info["regularMarketOpen"], info["regularMarketPreviousClose"], info["regularMarketDayHigh"], info["regularMarketDayLow"]]
 
-    def get_stock_chart_data(self, duration, metric_type) -> list:
+    def getLiveStockData(self) -> None:
+        URL = f"https://query2.finance.yahoo.com/v6/finance/options/{self.stock_code}"
+
+        try:
+            result = search(URL)
+            info = str(result["optionChain"]["result"][0]["quote"]["regularMarketPrice"])
+        except:
+            info = "Error! Please try again later."
+
+        self.current_stock_price_var.set(f"Current Price: {info}")
+
+        # Rerun the function every 2 seconds
+        self.master.after(2000, self.getLiveStockData)
+
+    def getStockChartData(self, duration: str, metric_type: str) -> list:
         if duration == "1d" or duration == "5d":
             interval = "1m"
         elif duration == "1mo" or duration == "3mo" or duration == "6mo" or duration == "1y" or duration == "ytd":
@@ -135,47 +153,52 @@ class StockInfoWindow():
         URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range={duration}&interval={interval}"
         result = search(URL)
 
-        time = [datetime.fromtimestamp(x) for x in result["chart"]["result"][0]["timestamp"]]
-        prices = result["chart"]["result"][0]["indicators"]["quote"][0][metric_type]
+        try:
+            time = [datetime.fromtimestamp(x) for x in result["chart"]["result"][0]["timestamp"]]
+            prices = result["chart"]["result"][0]["indicators"]["quote"][0][metric_type]
+        except:
+            time, prices = [], []
 
         return time, prices
 
-    def change_chart_range(self, chart_range) -> None:
+    def changeChartRange(self, chart_range: str) -> None:
         self.plot1.clear()
 
         for i in self.chart_data_visibility:
             if bool(int(i.get())):
                 chart_data = self.chart_data_types[self.chart_data_visibility.index(i)]
-                time, data = self.get_stock_chart_data(chart_range[0], chart_data[0])
-                self.plot1.plot(time, data, "-", color=self.change_chart_color(chart_data[0]), label=chart_data[1])
+                time, data = self.getStockChartData(chart_range[0], chart_data[0])
+                self.plot1.plot(time, data, "-", color=self.changeGraphColor(chart_data[0]), label=chart_data[1])
 
-        self.show_chart_info()
+        self.plot1.set_title(f"{self.stock_code} Stock Chart ({chart_range[1]})")
+        self.showMainChartInfo()
 
         self.selected_chart_range.set(chart_range)
 
         self.chart_canvas.draw()
 
-    def toggle_chart_data(self) -> None:
+    def toggleChartPriceTypes(self) -> None:
         # Change the chart data to the selected data
         self.plot1.clear()
 
         for i in self.chart_data_visibility:
             if bool(int(i.get())):
                 chart_data = self.chart_data_types[self.chart_data_visibility.index(i)]
-                time, data = self.get_stock_chart_data(str(self.selected_chart_range.get().split(", ")[0][2:-1]), chart_data[0])
-                self.plot1.plot(time, data, "-", color=self.change_chart_color(chart_data[0]), label=chart_data[1])
+                time, data = self.getStockChartData(str(self.selected_chart_range.get().split(", ")[0][2:-1]), chart_data[0])
+                self.plot1.plot(time, data, "-", color=self.changeGraphColor(chart_data[0]), label=chart_data[1])
 
-        self.show_chart_info()
+        self.plot1.set_title(f"{self.stock_code} Stock Chart ({str(self.selected_chart_range.get().split(', ')[1][1:-2])})")
+        self.showMainChartInfo()
 
         self.chart_canvas.draw()
 
-    def show_chart_info(self) -> None:
+    def showMainChartInfo(self) -> None:
         self.plot1.set_ylabel("Price")
         self.plot1.set_xlabel("Time")
         self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
         self.plot1.legend()
 
-    def change_chart_color(self, data) -> str:
+    def changeGraphColor(self, data: str) -> str:
         if data == "close":
             return "black"
         elif data == "open":
@@ -188,29 +211,29 @@ class StockInfoWindow():
             return "black"
 
 # Functions
-def open_database(filename):
+def openDatabase(filename: str) -> sqlite3.Connection:
     connection = sqlite3.connect(filename)
     connection.row_factory = sqlite3.Row
     return connection
 
-def read_database(connection, sql):
+def readDatabase(connection: sqlite3.Connection, sql: str) -> 'list[dict]':
     cursor = connection.cursor()
     cursor.execute(sql)
     result = [ dict(row) for row in cursor.fetchall() ]
     return result
 
-def write_database(connection, sql):
+def writeDatabase(connection: sqlite3.Connection, sql: str) -> int:
     cursor = connection.cursor()
     rows_affected = cursor.execute(sql).rowcount
     connection.commit()
     return rows_affected
 
-def close_database(connection):
+def closeDatabase(connection: sqlite3.Connection) -> None:
     connection.close()
 
-def search(URL):
+def search(URL: str) -> dict:
     # If debug is enabled, don't search (as if it's offline)
-    if debug:
+    if offline_mode:
         return ""
 
     # Search the given link and return the data in a dictionary
@@ -219,7 +242,7 @@ def search(URL):
     result = result.json()
     return result
 
-def get_stock_name(stock_code):
+def fetchStockName(stock_code: str) -> str:
     URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
     result = search(URL)
 
@@ -231,7 +254,7 @@ def get_stock_name(stock_code):
 
     return name
 
-def get_stock_currency(stock_code):
+def fetchStockCurrency(stock_code: str) -> str:
     URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
     result = search(URL)
 
@@ -243,7 +266,7 @@ def get_stock_currency(stock_code):
 
     return currency
 
-def get_exchange_rate(currency1, currency2):
+def fetchExchangeRate(currency1: str, currency2: str) -> 'float | str':
     URL = f"https://v6.exchangerate-api.com/v6/{exchange_rate_api_key}/latest/{currency1}"
     result = search(URL)
 
@@ -255,7 +278,7 @@ def get_exchange_rate(currency1, currency2):
 
     return rate
 
-def get_stock_info(stock_code):
+def fetchStockInfo(stock_code: str) -> list:
     URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
 
     return_info = []
@@ -264,7 +287,7 @@ def get_stock_info(stock_code):
         result = search(URL)
         return_info.append(result["optionChain"]["result"][0]["quote"]["regularMarketPrice"])
 
-        update_stock_current_price(stock_code, return_info[-1])
+        updateStockPrice(stock_code, return_info[-1])
     except:
         return_info.append("Error")
 
@@ -276,52 +299,52 @@ def get_stock_info(stock_code):
         else:
             return_info.append("↓")
 
-        update_stock_price_change(stock_code, return_info[-1])
+        updateStockPriceChange(stock_code, return_info[-1])
     except:
         return_info.append("Error")
 
     return return_info
 
-def add_stock():
+def addStockToPortfolio() -> None:
     code = input_code_field.get()
     price = float(input_price_field.get())
     quantity = int(input_quantity_field.get())
-    true_currency = get_stock_currency(code)
+    true_currency = fetchStockCurrency(code)
     currency = currency_field.get()
 
     if "" in [code, currency] or price <= 0 or quantity <= 0:
         return
 
     if true_currency != "Error":
-        exchange_rate = get_exchange_rate(currency, true_currency)
+        exchange_rate = fetchExchangeRate(currency, true_currency)
         if exchange_rate != "Error":
             price *= exchange_rate
             currency = true_currency
 
     # Add to the database
-    write_database(connection, f"INSERT INTO stocks (stock_code, stock_name, quantity, buying_price, currency) VALUES ('{code}', '{get_stock_name(code)}', {quantity}, {price}, '{currency}');")
+    writeDatabase(connection, f"INSERT INTO stocks (stock_code, stock_name, quantity, buying_price, currency) VALUES ('{code}', '{fetchStockName(code)}', {quantity}, {price}, '{currency}');")
     add_successful_text = Label(text=f"{quantity} {code} stocks added successfully! Please restart the application to update your portfolio.", master=add_frame, font=(font_family, body_font_size))
     add_successful_text.grid(row=2, columnspan=4)
 
-def remove_stock(stock_code):
+def removeStockFromPortfolio(stock_code: str) -> None:
     # Remove from database
-    write_database(connection, f"DELETE FROM stocks WHERE stock_code='{stock_code}';")
+    writeDatabase(connection, f"DELETE FROM stocks WHERE stock_code='{stock_code}';")
     remove_successful_text = Label(text=f"{stock_code} stocks removed successfully! Please restart the program to remove it from your portfolio.", master=window, font=(font_family, body_font_size))
     remove_successful_text.grid(row=2, column=0)
 
-def update_stock_update_date(stock_code):
-    write_database(connection, f"UPDATE stocks SET last_updated=datetime('now', 'localtime') WHERE stock_code='{stock_code}';")
+def updateStockLastUpdated(stock_code: str) -> None:
+    writeDatabase(connection, f"UPDATE stocks SET last_updated=datetime('now', 'localtime') WHERE stock_code='{stock_code}';")
 
-def update_stock_current_price(stock_code, current_price):
-    write_database(connection, f"UPDATE stocks SET selling_price={current_price} WHERE stock_code='{stock_code}';")
+def updateStockPrice(stock_code: str, current_price: float) -> None:
+    writeDatabase(connection, f"UPDATE stocks SET selling_price={current_price} WHERE stock_code='{stock_code}';")
 
-def update_stock_price_change(stock_code, price_change):
-    write_database(connection, f"UPDATE stocks SET price_change='{price_change}' WHERE stock_code='{stock_code}';")
+def updateStockPriceChange(stock_code: str, price_change: str) -> None:
+    writeDatabase(connection, f"UPDATE stocks SET price_change='{price_change}' WHERE stock_code='{stock_code}';")
 
 # Open database
 file_name = "stocks.db"
-connection = open_database(file_name)
-table = read_database(connection, "SELECT * FROM stocks;")
+connection = openDatabase(file_name)
+table = readDatabase(connection, "SELECT * FROM stocks;")
 
 # Show app
 window = Tk()
@@ -363,7 +386,7 @@ i = 0
 while i < len(table):
     stock = table[i]
 
-    stock_info = get_stock_info(stock["stock_code"])
+    stock_info = fetchStockInfo(stock["stock_code"])
     if "Error" in stock_info:
         price = stock["selling_price"]
         change = stock["price_change"]
@@ -390,12 +413,12 @@ while i < len(table):
     if stock["stock_name"] == "Error":
         last_updated_date = "Error"
     elif stock["last_updated"] == None:
-        update_stock_update_date(stock["stock_code"])
+        updateStockLastUpdated(stock["stock_code"])
         last_updated_date = str(datetime.now()).split(".")[0]
     elif "Error" in stock_info:
         last_updated_date = stock["last_updated"]
     else:
-        update_stock_update_date(stock["stock_code"])
+        updateStockLastUpdated(stock["stock_code"])
         last_updated_date = str(datetime.now()).split(".")[0]
 
     stocks.append([
@@ -409,7 +432,7 @@ while i < len(table):
         Label(text=change, master=stock_info_frame, padding=padding, foreground=change_colour, font=(font_family, body_font_size, "bold")),
         Label(text=profit, master=stock_info_frame, padding=padding, foreground=profit_colour, font=(font_family, body_font_size)),
         Label(text=last_updated_date, master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
-        Button(text="Remove", master=stock_info_frame, padding=padding, command=lambda stock_code=stock["stock_code"]: remove_stock(stock_code)),
+        Button(text="Remove", master=stock_info_frame, padding=padding, command=lambda stock_code=stock["stock_code"]: removeStockFromPortfolio(stock_code)),
     ])
 
     i += 1
@@ -425,7 +448,7 @@ input_price_help = Label(text="Price Paid", master=add_frame)
 input_price_field = Entry(master=add_frame)
 currency_help = Label(text="Currency (e.g.: USD)", master=add_frame)
 currency_field = Entry(master=add_frame)
-submit_button = Button(text="Add Stock", master=add_frame, command=lambda : add_stock())
+submit_button = Button(text="Add Stock", master=add_frame, command=lambda : addStockToPortfolio())
 
 input_code_help.grid(row=0, column=0)
 input_code_field.grid(row=1, column=0)
@@ -449,4 +472,4 @@ add_frame.grid(row=3, column=0)
 window.mainloop()
 
 # Close database and exit
-close_database(connection)
+closeDatabase(connection)
