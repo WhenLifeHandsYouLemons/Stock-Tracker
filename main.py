@@ -1,5 +1,5 @@
 # If debug is enabled, the program will not search for stock information online
-offline_mode = True
+offline_mode = False
 
 from datetime import datetime           # For getting the current date and time
 import sqlite3                          # For database management
@@ -16,13 +16,14 @@ try:
 except:
     exchange_rate_api_key = "Error"
 
+
 class StockInfoWindow():
     def __init__(self, master, stock_code: str) -> None:
         self.stock_code = stock_code
 
         self.master = Toplevel(master)
         self.master.configure()
-        self.master.title(f"{stock_code} Stock Information")
+        self.master.title(f"{fetchStockName(stock_code)} Stock Information")
 
         self.font_family = "Arial"
         self.body_font_size = 12
@@ -35,7 +36,7 @@ class StockInfoWindow():
 
     def pageItems(self) -> None:
         title_frame = Frame(master=self.master, padding=15)
-        txt_title = Label(text=f"{self.stock_code} Stock Information", master=title_frame, font=(self.font_family, self.title_font_size))
+        txt_title = Label(text=f"{fetchStockName(self.stock_code)} ({self.stock_code}) Stock Information", master=title_frame, font=(self.font_family, self.title_font_size))
         txt_title.pack()
 
         stock_info_frame = Frame(master=self.master, padding=5)
@@ -83,38 +84,42 @@ class StockInfoWindow():
         chart_options_frame.grid(row=0, column=0)
 
         # Stock chart
-        self.chart = Figure(figsize = (10, 5), dpi = 75)
-        self.plot1 = self.chart.add_subplot()
-        self.chart_canvas = FigureCanvasTkAgg(self.chart, master=stock_info_frame)
+        self.fig = Figure(figsize = (10, 5), dpi = 75)
+        self.plot1 = self.fig.subplots(1, 1)
+        self.plot1.set_autoscaley_on(False)
+        self.chart_canvas = FigureCanvasTkAgg(self.fig, master=stock_info_frame)
 
         self.toggleChartPriceTypes()
+
+        # https://stackoverflow.com/a/47166787
+        self.fig.canvas.mpl_connect("motion_notify_event", self.hover)
 
         self.chart_canvas.get_tk_widget().grid(row=0, column=1)
 
         # Show the current, opening, closing, high, and low prices
-        self.getStockData()
+        self.fetchStockData()
 
         # Get live stock data
-        self.master.after(2000, self.getLiveStockData)
+        self.master.after(2000, self.fetchLiveStockData)
         self.current_stock_price_var = StringVar(value="Current Price: Loading...")
 
         current_stock_price = Label(textvariable=self.current_stock_price_var, justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
         current_stock_price.grid(row=1, column=1, sticky="W")
 
-        opening_stock_price = Label(text=f"Opening Price: {self.getStockData()[1]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        opening_stock_price = Label(text=f"Opening Price: {self.fetchStockData()[1]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
         opening_stock_price.grid(row=2, column=1, sticky="W")
 
-        closing_stock_price = Label(text=f"Previous closing Price: {self.getStockData()[2]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        closing_stock_price = Label(text=f"Previous Closing Price: {self.fetchStockData()[2]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
         closing_stock_price.grid(row=3, column=1, sticky="W")
 
-        high_stock_price = Label(text=f"High Price: {self.getStockData()[3]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
+        high_stock_price = Label(text=f"High Price: {self.fetchStockData()[3]}", justify="left", master=stock_info_frame, font=(self.font_family, self.body_font_size))
         high_stock_price.grid(row=4, column=1, sticky="W")
 
         # Add the frames to the screen
         title_frame.grid(row=0, column=0)
         stock_info_frame.grid(row=1, column=0)
 
-    def getStockData(self) -> list:
+    def fetchStockData(self) -> list:
         URL = f"https://query2.finance.yahoo.com/v6/finance/options/{self.stock_code}"
 
         try:
@@ -126,29 +131,36 @@ class StockInfoWindow():
         # Returns, current price, opening price, closing price, high price, low price
         return [info["regularMarketPrice"], info["regularMarketOpen"], info["regularMarketPreviousClose"], info["regularMarketDayHigh"], info["regularMarketDayLow"]]
 
-    def getLiveStockData(self) -> None:
+    def fetchLiveStockData(self) -> None:
         URL = f"https://query2.finance.yahoo.com/v6/finance/options/{self.stock_code}"
 
         try:
             result = search(URL)
             info = str(result["optionChain"]["result"][0]["quote"]["regularMarketPrice"])
+
+            self.current_stock_price_var.set(f"Current Price: {info}")
+
+            # Rerun the function every minute
+            self.master.after(60000, self.fetchLiveStockData)
         except:
             info = "Error! Please try again later."
 
-        self.current_stock_price_var.set(f"Current Price: {info}")
+            self.current_stock_price_var.set(f"Current Price: {info}")
 
-        # Rerun the function every 2 seconds
-        self.master.after(2000, self.getLiveStockData)
+            # Rerun the function every 2 minutes in case of an error
+            self.master.after(120000, self.fetchLiveStockData)
 
-    def getStockChartData(self, duration: str, metric_type: str) -> list:
-        if duration == "1d" or duration == "5d":
+    def fetchStockChartData(self, duration: str, metric_type: str) -> list:
+        if duration == "1d":
             interval = "1m"
-        elif duration == "1mo" or duration == "3mo" or duration == "6mo" or duration == "1y" or duration == "ytd":
+        elif duration == "5d" or duration == "1mo" or duration == "3mo" or duration == "6mo" or duration == "1y" or duration == "ytd":
             interval = "1d"
         elif duration == "2y" or duration == "5y":
             interval = "1wk"
         elif duration == "max":
             interval = "1mo"
+        else:
+            interval = ""
 
         URL = f"https://query2.finance.yahoo.com/v8/finance/chart/{self.stock_code}?metrics={metric_type}?&range={duration}&interval={interval}"
         result = search(URL)
@@ -163,14 +175,32 @@ class StockInfoWindow():
 
     def changeChartRange(self, chart_range: str) -> None:
         self.plot1.clear()
+        self.lines = []
 
         for i in self.chart_data_visibility:
             if bool(int(i.get())):
                 chart_data = self.chart_data_types[self.chart_data_visibility.index(i)]
-                time, data = self.getStockChartData(chart_range[0], chart_data[0])
-                self.plot1.plot(time, data, "-", color=self.changeGraphColor(chart_data[0]), label=chart_data[1])
+                time, data = self.fetchStockChartData(chart_range[0], chart_data[0])
+                self.line = self.plot1.plot(time, data, "-", color=self.changeGraphColor(chart_data[0]), label=chart_data[1])
 
-        self.plot1.set_title(f"{self.stock_code} Stock Chart ({chart_range[1]})")
+                # Fill in missing data
+                for i, val in enumerate(data):
+                    if val == None:
+                        data[i] = data[i-1]
+                    elif i == 0 and val == None:
+                        data[i] = 0
+
+                xmin, xmax, ymin, ymax = self.plot1.axis()
+                if min(data) < ymin:
+                    ymin = min(data)
+                if max(data) > ymax:
+                    ymax = max(data)
+
+                self.plot1.axes.set_ylim([ymin, ymax])
+
+                self.plot1.fill_between(time, data, color=self.changeGraphColor(chart_data[0]), alpha=0.1)
+
+        self.plot1.set_title(f"{fetchStockName(self.stock_code)} ({self.stock_code}) Stock Chart ({chart_range[1]})")
         self.showMainChartInfo()
 
         self.selected_chart_range.set(chart_range)
@@ -180,14 +210,32 @@ class StockInfoWindow():
     def toggleChartPriceTypes(self) -> None:
         # Change the chart data to the selected data
         self.plot1.clear()
+        self.lines = []
 
         for i in self.chart_data_visibility:
             if bool(int(i.get())):
                 chart_data = self.chart_data_types[self.chart_data_visibility.index(i)]
-                time, data = self.getStockChartData(str(self.selected_chart_range.get().split(", ")[0][2:-1]), chart_data[0])
-                self.plot1.plot(time, data, "-", color=self.changeGraphColor(chart_data[0]), label=chart_data[1])
+                time, data = self.fetchStockChartData(str(self.selected_chart_range.get().split(", ")[0][2:-1]), chart_data[0])
+                self.line = self.plot1.plot(time, data, "-", color=self.changeGraphColor(chart_data[0]), label=chart_data[1])
 
-        self.plot1.set_title(f"{self.stock_code} Stock Chart ({str(self.selected_chart_range.get().split(', ')[1][1:-2])})")
+                # Fill in missing data
+                for i, val in enumerate(data):
+                    if val == None:
+                        data[i] = data[i-1]
+                    elif i == 0 and val == None:
+                        data[i] = 0
+
+                xmin, xmax, ymin, ymax = self.plot1.axis()
+                if min(data) < ymin:
+                    ymin = min(data)
+                if max(data) > ymax:
+                    ymax = max(data)
+
+                self.plot1.axes.set_ylim([ymin, ymax])
+
+                self.plot1.fill_between(time, data, color=self.changeGraphColor(chart_data[0]), alpha=0.1)
+
+        self.plot1.set_title(f"{fetchStockName(self.stock_code)} ({self.stock_code}) Stock Chart ({str(self.selected_chart_range.get().split(', ')[1][1:-2])})")
         self.showMainChartInfo()
 
         self.chart_canvas.draw()
@@ -196,7 +244,15 @@ class StockInfoWindow():
         self.plot1.set_ylabel("Price")
         self.plot1.set_xlabel("Time")
         self.plot1.grid(True, which="both", linestyle="--", linewidth=0.5)
-        self.plot1.legend()
+
+        for i in self.chart_data_visibility:
+            if bool(int(i.get())):
+                self.plot1.legend()
+
+        self.annot = self.plot1.axes.annotate("", xy=(0,0), xytext=(-20,20),textcoords="offset points",
+                    bbox=dict(boxstyle="round", fc="w"),
+                    arrowprops=dict(arrowstyle="->"))
+        self.annot.set_visible(False)
 
     def changeGraphColor(self, data: str) -> str:
         if data == "close":
@@ -210,7 +266,31 @@ class StockInfoWindow():
         else:
             return "black"
 
-# Functions
+    # https://stackoverflow.com/a/47166787
+    def updateAnnotation(self, ind):
+        x,y = self.line[0].get_data()
+        self.annot.xy = (x[ind["ind"][0]], y[ind["ind"][0]])
+        text = f"{str(x[ind['ind'][0]])}: {str(round(float(y[ind['ind'][0]]), 2))}"
+        self.annot.set_text(text)
+        self.annot.get_bbox_patch().set_alpha(0.75)
+
+    def hover(self, event):
+        vis = self.annot.get_visible()
+        if event.inaxes == self.plot1:
+            cont, ind = self.line[0].contains(event)
+            if cont:
+                self.updateAnnotation(ind)
+                self.annot.set_visible(True)
+                self.fig.canvas.draw_idle()
+            else:
+                if vis:
+                    self.annot.set_visible(False)
+                    self.fig.canvas.draw_idle()
+
+class StockNotFoundError(Exception):
+    pass
+
+
 def openDatabase(filename: str) -> sqlite3.Connection:
     connection = sqlite3.connect(filename)
     connection.row_factory = sqlite3.Row
@@ -278,33 +358,6 @@ def fetchExchangeRate(currency1: str, currency2: str) -> 'float | str':
 
     return rate
 
-def fetchStockInfo(stock_code: str) -> list:
-    URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
-
-    return_info = []
-
-    try:
-        result = search(URL)
-        return_info.append(result["optionChain"]["result"][0]["quote"]["regularMarketPrice"])
-
-        updateStockPrice(stock_code, return_info[-1])
-    except:
-        return_info.append("Error")
-
-    try:
-        stock_price_change = result["optionChain"]["result"][0]["quote"]["regularMarketChangePercent"]
-
-        if stock_price_change > 0:
-            return_info.append("↑")
-        else:
-            return_info.append("↓")
-
-        updateStockPriceChange(stock_code, return_info[-1])
-    except:
-        return_info.append("Error")
-
-    return return_info
-
 def addStockToPortfolio() -> None:
     code = input_code_field.get()
     price = float(input_price_field.get())
@@ -363,10 +416,7 @@ txt_title.pack()
 # Stock information frame
 padding = 5
 stock_info_frame = Frame(master=window, padding=10)
-stocks = []
-
-# Column information
-stocks.append([
+stocks = [[
     Label(text="", master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
     Label(text="Stock Code", master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
     Label(text="Stock Name", master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
@@ -378,7 +428,74 @@ stocks.append([
     Label(text="Profit/Loss", master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
     Label(text="Last Updated", master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
     Label(text="", master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
-])
+]]
+stocks_vars = []
+
+
+def getLiveStockData(i) -> None:
+    stock = table[i]
+    stock_code = stock["stock_code"]
+
+    URL = f"https://query2.finance.yahoo.com/v6/finance/options/{stock_code}"
+
+    try:
+        if stock["stock_name"] == "Error":
+            raise StockNotFoundError
+
+        result = search(URL)
+
+        # For stock price
+        stock_price = str(result["optionChain"]["result"][0]["quote"]["regularMarketPrice"])
+
+        stocks_vars[i][0].set(stock_price)
+
+        updateStockPrice(stock_code, float(stocks_vars[i][0].get()))
+
+        # For stock price change
+        stock_price_change = result["optionChain"]["result"][0]["quote"]["regularMarketChangePercent"]
+
+        if stock_price_change > 0:
+            stocks_vars[i][1][0].set("Increase")
+            stocks_vars[i][1][1].set("#060")
+        elif stock_price_change < 0:
+            stocks_vars[i][1][0].set("Decrease")
+            stocks_vars[i][1][1].set("#F11")
+        else:
+            stocks_vars[i][1][0].set("No change")
+            stocks_vars[i][1][1].set("#000")
+
+        updateStockPriceChange(stock_code, stocks_vars[i][1][0].get())
+
+        # For profit/loss calculation
+        try:
+            stocks_vars[i][2][0].set(str(round(((float(stocks_vars[i][0].get()) * int(stock["quantity"])) - float(stock["buying_price"])), 2)))
+
+            if "-" in stocks_vars[i][2][0].get():
+                stocks_vars[i][2][1].set("#F11")
+            else:
+                stocks_vars[i][2][1].set("#060")
+        except:
+            stocks_vars[i][2][0].set("Error")
+            stocks_vars[i][2][1].set("#000")
+
+        # For last updated time
+        updateStockLastUpdated(stock_code)
+        stocks_vars[i][3].set(str(datetime.now()).split(".")[0])
+
+        # Rerun the function every minute
+        window.after(60000, lambda i=i: getLiveStockData(i))
+    except StockNotFoundError:
+        stocks_vars[i][0].set("Error")
+        stocks_vars[i][1][0].set("Error")
+        stocks_vars[i][1][1].set("#222")
+        stocks_vars[i][2][0].set("Error")
+        stocks_vars[i][2][1].set("#000")
+        stocks_vars[i][3].set("Error")
+    except:
+        stocks_vars[i][3].set(stock["last_updated"])
+
+        # Rerun the function every 2 minutes in case of an error
+        window.after(120000, lambda i=i: getLiveStockData(i))
 
 # Get all the stock information and save it
 print("\nGetting latest stock information, please wait...")
@@ -386,53 +503,27 @@ i = 0
 while i < len(table):
     stock = table[i]
 
-    stock_info = fetchStockInfo(stock["stock_code"])
-    if "Error" in stock_info:
-        price = stock["selling_price"]
-        change = stock["price_change"]
-    else:
-        price = stock_info[0]
-        change = stock_info[1]
+    stocks_vars.append([
+        StringVar(),                # stock price
+        [StringVar(), StringVar()], # [price change, text colour]
+        [StringVar(), StringVar()], # [profit/loss, text colour]
+        StringVar(),                # last updated
+    ])
 
-    if change == "↑":
-        change_colour = "#009900"
-    else:
-        change_colour = "#FF0000"
-
-    try:
-        profit = str(round(((float(price) * int(stock["quantity"])) - float(stock["buying_price"])), 2))
-
-        if "-" in profit:
-            profit_colour = "#FF0000"
-        else:
-            profit_colour = "#00AA00"
-    except:
-        profit = "Error"
-        profit_colour = "#000000"
-
-    if stock["stock_name"] == "Error":
-        last_updated_date = "Error"
-    elif stock["last_updated"] == None:
-        updateStockLastUpdated(stock["stock_code"])
-        last_updated_date = str(datetime.now()).split(".")[0]
-    elif "Error" in stock_info:
-        last_updated_date = stock["last_updated"]
-    else:
-        updateStockLastUpdated(stock["stock_code"])
-        last_updated_date = str(datetime.now()).split(".")[0]
+    getLiveStockData(i)
 
     stocks.append([
-        Button(text="View Info", master=stock_info_frame, padding=padding, command=lambda stock_code=stock["stock_code"]: StockInfoWindow(window, stock_code)),
+        Button(text="View Info", master=stock_info_frame, padding=padding, command=lambda code=stock["stock_code"]: StockInfoWindow(window, code)),
         Label(text=stock["stock_code"], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
         Label(text=stock["stock_name"], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
         Label(text=stock["currency"], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
-        Label(text=price, master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
+        Label(textvariable=stocks_vars[i][0], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
         Label(text=stock["quantity"], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
         Label(text=stock["buying_price"], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
-        Label(text=change, master=stock_info_frame, padding=padding, foreground=change_colour, font=(font_family, body_font_size, "bold")),
-        Label(text=profit, master=stock_info_frame, padding=padding, foreground=profit_colour, font=(font_family, body_font_size)),
-        Label(text=last_updated_date, master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
-        Button(text="Remove", master=stock_info_frame, padding=padding, command=lambda stock_code=stock["stock_code"]: removeStockFromPortfolio(stock_code)),
+        Label(textvariable=stocks_vars[i][1][0], master=stock_info_frame, padding=padding, foreground=stocks_vars[i][1][1].get(), font=(font_family, body_font_size, "bold")),
+        Label(textvariable=stocks_vars[i][2][0], master=stock_info_frame, padding=padding, foreground=stocks_vars[i][2][1].get(), font=(font_family, body_font_size)),
+        Label(textvariable=stocks_vars[i][3], master=stock_info_frame, padding=padding, font=(font_family, body_font_size)),
+        Button(text="Remove", master=stock_info_frame, padding=padding, command=lambda code=stock["stock_code"]: removeStockFromPortfolio(code)),
     ])
 
     i += 1

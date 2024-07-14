@@ -8,6 +8,7 @@
 - Fast, lightweight, and can run on any PC, old or new
 - Intuitive and easy-to-use interface
 - Adjusts your buying price for inflation and calculates the correct price accordingly
+- Automatically updates stock prices and data every minute
 
 ## Usage
 
