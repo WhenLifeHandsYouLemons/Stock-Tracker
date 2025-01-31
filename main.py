@@ -51,10 +51,10 @@ class StockInfoWindow():
                              ["1mo", "1 Month"],
                              ["3mo", "3 Months"],
                              ["6mo", "6 Months"],
+                             ["ytd", "Year to Date"],
                              ["1y", "1 Year"],
                              ["2y", "2 Years"],
                              ["5y", "5 Years"],
-                             ["ytd", "Year to Date"],
                              ["max", "Max"]]
 
         self.selected_chart_range = StringVar()
@@ -433,6 +433,8 @@ stocks_vars = []
 
 
 def getLiveStockData(i) -> None:
+    stocks_vars[i][0].set()
+
     stock = table[i]
     stock_code = stock["stock_code"]
 
@@ -504,10 +506,10 @@ while i < len(table):
     stock = table[i]
 
     stocks_vars.append([
-        StringVar(),                # stock price
-        [StringVar(), StringVar()], # [price change, text colour]
-        [StringVar(), StringVar()], # [profit/loss, text colour]
-        StringVar(),                # last updated
+        StringVar(value="Loading..."),                                  # stock price
+        [StringVar(value="Loading..."), StringVar()], # [price change, text colour]
+        [StringVar(value="Loading..."), StringVar()], # [profit/loss, text colour]
+        StringVar(value="Loading..."),                                  # last updated
     ])
 
     getLiveStockData(i)
@@ -535,7 +537,7 @@ input_code_help = Label(text="Stock Code", master=add_frame)
 input_code_field = Entry(master=add_frame)
 input_quantity_help = Label(text="Quantity", master=add_frame)
 input_quantity_field = Entry(master=add_frame)
-input_price_help = Label(text="Price Paid", master=add_frame)
+input_price_help = Label(text="Total Price Paid", master=add_frame)
 input_price_field = Entry(master=add_frame)
 currency_help = Label(text="Currency (e.g.: USD)", master=add_frame)
 currency_field = Entry(master=add_frame)
